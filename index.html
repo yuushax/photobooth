@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhotoBooth App</title>
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body class="bg-base-200 min-h-screen flex items-center justify-center">
+  <div class="max-w-4xl w-full p-4">
+    <h1 class="text-4xl font-bold text-center mb-6">PhotoBooth</h1>
+
+    <div class="relative rounded-lg overflow-hidden border-4 border-primary shadow-xl">
+      <video id="preview" autoplay playsinline class="w-full transform scale-x-[-1]"></video>
+      <div id="countdown" class="absolute inset-0 flex items-center justify-center text-6xl font-bold text-primary animate-pulse"></div>
+      <div id="error-message" class="text-center text-red-500 mt-4 hidden">Camera access denied or unavailable.</div>
+    </div>
+
+    <div id="photo-preview" class="grid grid-cols-3 gap-4 mt-6"></div>
+
+    <button id="start-btn" class="btn btn-primary w-full mt-6">Start Capture</button>
+    <a id="download-btn" class="btn btn-secondary w-full mt-4 hidden" download="photobooth.png">Download Photo</a>
+  </div>
+
+  <script>
+    const video = document.getElementById('preview');
+    const countdown = document.getElementById('countdown');
+    const startBtn = document.getElementById('start-btn');
+    const downloadBtn = document.getElementById('download-btn');
+    const errorMessage = document.getElementById('error-message');
+    const photoPreview = document.getElementById('photo-preview');
+
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        errorMessage.classList.remove('hidden');
+      }
+    }
+
+    async function startCapture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      let count = 5;
+      const photos = [];
+
+      for (let i = 0; i < 6; i++) {
+        countdown.textContent = count;
+
+        await new Promise((resolve) => {
+          const timer = setInterval(() => {
+            count--;
+            countdown.textContent = count;
+            if (count <= 0) {
+              clearInterval(timer);
+              photos.push(captureFrame());
+              displayPreview(photos[photos.length - 1]);
+              resolve();
+            }
+          }, 1000);
+        });
+
+        count = 5;
+      }
+
+      countdown.textContent = '';
+      wrapPhotosOnCanvas(photos);
+    }
+
+    function captureFrame() {
+      const frameCanvas = document.createElement('canvas');
+      frameCanvas.width = video.videoWidth;
+      frameCanvas.height = video.videoHeight;
+      const frameCtx = frameCanvas.getContext('2d');
+      frameCtx.translate(frameCanvas.width, 0);
+      frameCtx.scale(-1, 1);
+      frameCtx.drawImage(video, 0, 0);
+      return frameCanvas;
+    }
+
+    function displayPreview(canvas) {
+      const img = document.createElement('img');
+      img.src = canvas.toDataURL('image/png');
+      img.className = 'rounded-lg shadow-md';
+      photoPreview.appendChild(img);
+    }
+
+    function wrapPhotosOnCanvas(photos) {
+      const canvas = document.createElement('canvas');
+      const framePadding = 20;
+      const photoWidth = photos[0].width;
+      const photoHeight = photos[0].height;
+
+      canvas.width = photoWidth * 2 + framePadding * 3;
+      canvas.height = photoHeight * 3 + framePadding * 4;
+
+      const ctx = canvas.getContext('2d');
+
+      photos.forEach((photo, index) => {
+        const x = (index % 2) * (photoWidth + framePadding) + framePadding;
+        const y = Math.floor(index / 2) * (photoHeight + framePadding) + framePadding;
+        ctx.drawImage(photo, x, y);
+      });
+
+      const url = canvas.toDataURL('image/png');
+      downloadBtn.href = url;
+      downloadBtn.classList.remove('hidden');
+    }
+
+    startBtn.addEventListener('click', startCapture);
+
+    initCamera();
+  </script>
+</body>
+</html>
